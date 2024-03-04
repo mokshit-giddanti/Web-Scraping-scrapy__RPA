@@ -1,0 +1,17 @@
+Requirements
+-----------------
+python 3.8 or higher
+
+    pip commands 
+    ---------------
+    pip install scrapy
+    after installing start a project and go inside the project and the install:
+        "pip install ipython"
+    and in scrapy.cfg type "shell=ipython" 
+
+
+scrapy commands
+------------------
+scrapy startproject <project-name>  ->to start a new project 
+scrapy shell -> to access the shell 
+scrapy genspider <url-of-the-website>

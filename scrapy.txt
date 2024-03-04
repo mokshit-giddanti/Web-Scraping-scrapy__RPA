@@ -1,0 +1,155 @@
+pip install scrapy
+
+scrapy startproject bookscraper
+
+cd bookscraper
+cd bookscraper
+cd spiders
+
+scrapy genspider books.toscrape.com
+pip install ipython 
+then go to scrapy.cfg
+write "shell=ipython"
+
+scrapy shell
+
+response=fetch('http://books.toscrape.com')
+response.css('article.product_pod) ->>>article.product_pod is the attribute of a book 
+books=response.css('article.product_pod)
+len(books)
+book=books[0] -> stores all the info of the 1st book
+book.css('h3 a::text').get()
+book.css('.product_price .price_color::text').get() -> gives price of the book
+book.css('h3 a').attrib['href'] -> gives the specific page of the book
+exit -> exits from the shell
+cd ..
+#in bookspider.py
+"""
+def parse(self, response):
+        books=response.css('article.product_pod')
+
+        for book in books:
+            yield{
+                'name':book.css('h3 a::text').get(),
+                'price':book.css('.product_price .price_color::text').get(),
+                'url':book.css('h3 a').attrib['href'],
+            }
+"""
+scrapy crawl bookspider -> get's all the books names price and url as mentioned in yield
+
+since we have multiple pages and those pages are having multiple items we need all of the items in all pages so we need to go to all the next pages and get data from them.
+
+scrapy shell
+
+fetch('https://books.toscrap.com/')
+
+response.css('li.next a ::attr(href)').get() -> li.next and a are the attributes of css of the next button
+
+exit
+
+# in bookspider.py
+"""
+def parse(self, response):
+        books=response.css('article.product_pod')
+
+        for book in books:
+            yield{
+                'name':book.css('h3 a::text').get(),
+                'price':book.css('.product_price .price_color::text').get(),
+                'url':book.css('h3 a').attrib['href'],
+            }
+        nextpage=response.css('li.next a ::attr(href)').get()
+        if nextpage is not None:
+            nextpageurl='https://boks.toscrape.com/'+nextpage
+            yield response.follow(nextpageurl,callback=self.parse)
+"""
+cd ..
+
+scrapy crawl bookspider
+
+we will get items from some pages only since the urls are not same for all pages,so we need to check some random pages to check whats the problem and we will find that some pages are having "/catalogue" in their css "<a href>" urls and some are having them in the page urls 
+
+so we need to add "/catalogue" in the url those pages which do not have them
+#changes in bookspider.py
+"""
+def parse(self, response):
+        books=response.css('article.product_pod')
+
+        for book in books:
+            yield{
+                'name':book.css('h3 a::text').get(),
+                'price':book.css('.product_price .price_color::text').get(),
+                'url':book.css('h3 a').attrib['href'],
+            }
+        nextpage=response.css('li.next a ::attr(href)').get()
+        if nextpage is not None:
+            if 'catalogue/' in nextpage:
+                nextpageurl='https://books.toscrape.com/'+nextpage
+            else:
+                nextpageurl='https://books.toscrape.com/catalogue/'+nextpage
+            yield response.follow(nextpageurl,callback=self.parse)
+"""
+scrapy crawl bookspider
+
+now we will get the data of all the items in all the pages but we want the data of each individual item from all pages.
+
+so we have to navigate to all the items in a page and get data and repeat for all the pages.
+
+scrpay shell
+
+we need to use css selectors and test them in the scrapy schell
+
+fetch('http://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html') ->the url is for a specific item in the page and we are using it to test
+
+response.css('.product_page') -> this gives all data on the item and "product_page" is the css attribute
+response.css('.product_main h1::text').get() -> to get the title of the item we selected
+
+table_rows=response.css('table rows') -> to get all the data from the table in the item page
+
+table_rows[2].css('td ::text').get() -> this gives the data from a specific row
+response.css('p.star-rating').attrib['class'] -> this gives the rating of the item and here we are getting the value from the attribute class named "p.star-rating"
+
+now add them in bookspider.py
+
+"""
+def parse(self, response):
+        books=response.css('article.product_pod')
+        for book in books:
+            # yield{
+            #     'name':book.css('h3 a::text').get(),
+            #     'price':book.css('.product_price .price_color::text').get(),
+            #     'url':book.css('h3 a').attrib['href'],
+            # }
+            bookpage=book.css('h3 a ::attr(href)').get()
+            # if nextpage is not None:
+            if 'catalogue/' in bookpage:
+                bookurl='https://books.toscrape.com/'+bookpage
+            else:
+                bookurl='https://books.toscrape.com/catalogue/'+bookpage
+            yield response.follow(bookurl,callback=self.parse_book_page)
+        nextpage=response.css('li.next a ::attr(href)').get()
+        if nextpage is not None:
+            if 'catalogue/' in nextpage:
+                nextpageurl='https://books.toscrape.com/'+nextpage
+            else:
+                nextpageurl='https://books.toscrape.com/catalogue/'+nextpage
+            yield response.follow(nextpageurl,callback=self.parse)
+    
+    def parse_book_page(self,response):
+        table_rows=response.css('table tr')
+        yield{
+            'url':response.url,
+            'title':response.css('.product_main h1::text').get(),
+            'Product Type':table_rows[1].css('td ::text').get(),
+            'Price':table_rows[3].css('td ::text').get(),
+            'Tax':table_rows[4].css('td ::text').get(),
+            'Availability':table_rows[5].css('td ::text').get(),
+            'reviews':table_rows[6].css('td ::text').get(),
+            'rating':response.css('p.star-rating').attrib['class'],
+        }
+
+"""
+run "scrapy crawl bookspider " we will get the data of all the items in all pages 
+
+if u wanna save the data instead of printing on the terminal u can run "scrapy crawl bookspider.csv" or
+"scrapy crawl bookspider.json"
